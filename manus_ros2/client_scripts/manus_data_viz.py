@@ -20,15 +20,27 @@ class MinimalSubscriber(Node):
         super().__init__("manus_ros2_client_py")
         self.sub_poses = self.create_subscription(
             ManusNodePoses,
-            "/manus_node_poses",
+            "/manus_node_poses_0",
             self.node_callback,
-            10,
+            20,
         )
         self.sub_hierarchies = self.create_subscription(
             ManusNodeHierarchy,
-            "/manus_node_hierarchy",
+            "/manus_node_hierarchy_0",
             self.hierarchy_callback,
-            10,
+            20,
+        )
+        self.sub_poses = self.create_subscription(
+            ManusNodePoses,
+            "/manus_node_poses_1",
+            self.node_callback,
+            20,
+        )
+        self.sub_hierarchies = self.create_subscription(
+            ManusNodeHierarchy,
+            "/manus_node_hierarchy_1",
+            self.hierarchy_callback,
+            20,
         )
         self.timer = self.create_timer(0.02, self.timer_callback)
         self.glove_viz_map: dict[str, GloveViz] = {}

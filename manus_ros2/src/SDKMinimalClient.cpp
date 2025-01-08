@@ -17,23 +17,18 @@ SDKMinimalClient *SDKMinimalClient::s_Instance = nullptr;
 
 SDKMinimalClient::SDKMinimalClient() : Node("manus_minimal_client")
 {
-    if (s_Instance != nullptr)
-    {
+    if (s_Instance != nullptr) {
         throw std::runtime_error("SDKMinimalClient can only be initialized once.");
     }
     s_Instance = this;
 
-    m_NodeHierarchyPublisher = create_publisher<manus_ros2_msgs::msg::ManusNodeHierarchy>("manus_node_hierarchy", 10);
-    m_NodePosePublisher = create_publisher<manus_ros2_msgs::msg::ManusNodePoses>("manus_node_poses", 10);
-
-    m_TimerPoses = create_wall_timer(1ms, [this] { TimerPosesCallback(); });
+    m_TimerPoses = create_wall_timer(10ms, [this] { TimerPosesCallback(); });
     m_TimerHierarchy = create_wall_timer(200ms, [this] { TimerHierarchyCallback(); });
 
     // initialize client
     ClientLog::print("Starting minimal client!");
     auto t_Response = Initialize();
-    if (t_Response != ClientReturnCode::ClientReturnCode_Success)
-    {
+    if (t_Response != ClientReturnCode::ClientReturnCode_Success) {
         ClientLog::error("Failed to initialize the SDK. Are you sure the correct ManusSDKLibary is used?");
         throw std::runtime_error("Failed to initialize the SDK. Are you sure the correct ManusSDKLibary is used?");
     }
@@ -45,8 +40,7 @@ SDKMinimalClient::SDKMinimalClient() : Node("manus_minimal_client")
         ? ClientLog::print("minimal client is running in integrated mode.")
         : ClientLog::print("minimal client is connecting to MANUS Core. (make sure it is running)");
 
-    while (Connect() != ClientReturnCode::ClientReturnCode_Success)
-    {
+    while (Connect() != ClientReturnCode::ClientReturnCode_Success) {
         // not yet connected. wait
         ClientLog::print("minimal client could not connect.trying again in a second.");
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -58,9 +52,8 @@ SDKMinimalClient::SDKMinimalClient() : Node("manus_minimal_client")
     // set the hand motion mode of the RawSkeletonStream. This is optional and can be set to any of the HandMotion enum values. Default = None
     // auto will make it move based on available tracking data. If none is available IMU rotation will be used.
     const SDKReturnCode t_HandMotionResult = CoreSdk_SetRawSkeletonHandMotion(HandMotion_Auto);
-    if (t_HandMotionResult != SDKReturnCode::SDKReturnCode_Success)
-    {
-        ClientLog::error("Failed to set hand motion mode. The value returned was {}.", (int32_t)t_HandMotionResult);
+    if (t_HandMotionResult != SDKReturnCode::SDKReturnCode_Success) {
+        ClientLog::error("Failed to set hand motion mode. The value returned was {}.", (int32_t) t_HandMotionResult);
     }
 }
 
@@ -84,8 +77,7 @@ ClientReturnCode SDKMinimalClient::Initialize()
     // }
 
     const ClientReturnCode t_IntializeResult = InitializeSDK();
-    if (t_IntializeResult != ClientReturnCode::ClientReturnCode_Success)
-    {
+    if (t_IntializeResult != ClientReturnCode::ClientReturnCode_Success) {
         return ClientReturnCode::ClientReturnCode_FailedToInitialize;
     }
 
@@ -104,24 +96,23 @@ ClientReturnCode SDKMinimalClient::InitializeSDK()
     // std::cin >> t_ConnectionTypeInput;
     t_ConnectionTypeInput = "1";
 
-    switch (t_ConnectionTypeInput[0])
-    {
-    case '1':
-        m_ConnectionType = ConnectionType::ConnectionType_Integrated;
-        ClientLog::print("using connection type: integrated");
-        break;
-    case '2':
-        m_ConnectionType = ConnectionType::ConnectionType_Local;
-        ClientLog::print("using connection type: local");
-        break;
-    case '3':
-        m_ConnectionType = ConnectionType::ConnectionType_Remote;
-        ClientLog::print("using connection type: remote");
-        break;
-    default:
-        m_ConnectionType = ConnectionType::ConnectionType_Invalid;
-        ClientLog::print("Invalid input, try again");
-        return InitializeSDK();
+    switch (t_ConnectionTypeInput[0]) {
+        case '1':
+            m_ConnectionType = ConnectionType::ConnectionType_Integrated;
+            ClientLog::print("using connection type: integrated");
+            break;
+        case '2':
+            m_ConnectionType = ConnectionType::ConnectionType_Local;
+            ClientLog::print("using connection type: local");
+            break;
+        case '3':
+            m_ConnectionType = ConnectionType::ConnectionType_Remote;
+            ClientLog::print("using connection type: remote");
+            break;
+        default:
+            m_ConnectionType = ConnectionType::ConnectionType_Invalid;
+            ClientLog::print("Invalid input, try again");
+            return InitializeSDK();
     }
 
     // Invalid connection type detected
@@ -132,14 +123,12 @@ ClientReturnCode SDKMinimalClient::InitializeSDK()
     // before we can use the SDK, some internal SDK bits need to be initialized.
     bool t_Remote = m_ConnectionType != ConnectionType::ConnectionType_Integrated;
     const SDKReturnCode t_InitializeResult = CoreSdk_Initialize(SessionType::SessionType_CoreSDK, t_Remote);
-    if (t_InitializeResult != SDKReturnCode::SDKReturnCode_Success)
-    {
+    if (t_InitializeResult != SDKReturnCode::SDKReturnCode_Success) {
         return ClientReturnCode::ClientReturnCode_FailedToInitialize;
     }
 
     const ClientReturnCode t_CallBackResults = RegisterAllCallbacks();
-    if (t_CallBackResults != ::ClientReturnCode::ClientReturnCode_Success)
-    {
+    if (t_CallBackResults != ::ClientReturnCode::ClientReturnCode_Success) {
         return t_CallBackResults;
     }
 
@@ -166,8 +155,7 @@ ClientReturnCode SDKMinimalClient::InitializeSDK()
     const SDKReturnCode t_InitializeResult = CoreSdk_InitializeCoordinateSystemWithDirection(t_Direction, true);
     */
 
-    if (t_CoordinateResult != SDKReturnCode::SDKReturnCode_Success)
-    {
+    if (t_CoordinateResult != SDKReturnCode::SDKReturnCode_Success) {
         return ClientReturnCode::ClientReturnCode_FailedToInitialize;
     }
 
@@ -180,13 +168,11 @@ ClientReturnCode SDKMinimalClient::InitializeSDK()
 ClientReturnCode SDKMinimalClient::ShutDown()
 {
     const SDKReturnCode t_Result = CoreSdk_ShutDown();
-    if (t_Result != SDKReturnCode::SDKReturnCode_Success)
-    {
+    if (t_Result != SDKReturnCode::SDKReturnCode_Success) {
         return ClientReturnCode::ClientReturnCode_FailedToShutDownSDK;
     }
 
-    if (!PlatformSpecificShutdown())
-    {
+    if (!PlatformSpecificShutdown()) {
         return ClientReturnCode::ClientReturnCode_FailedPlatformSpecificShutdown;
     }
 
@@ -203,11 +189,10 @@ ClientReturnCode SDKMinimalClient::RegisterAllCallbacks()
     // see OnRawSkeletonStreamCallback for more details.
     const SDKReturnCode t_RegisterRawSkeletonCallbackResult = CoreSdk_RegisterCallbackForRawSkeletonStream(
         *OnRawSkeletonStreamCallback);
-    if (t_RegisterRawSkeletonCallbackResult != SDKReturnCode::SDKReturnCode_Success)
-    {
+    if (t_RegisterRawSkeletonCallbackResult != SDKReturnCode::SDKReturnCode_Success) {
         ClientLog::error(
             "Failed to register callback function for processing raw skeletal data from Manus Core. The value returned was {}.",
-            (int32_t)t_RegisterRawSkeletonCallbackResult);
+            (int32_t) t_RegisterRawSkeletonCallbackResult);
         return ClientReturnCode::ClientReturnCode_FailedToInitialize;
     }
 
@@ -218,33 +203,32 @@ ClientReturnCode SDKMinimalClient::RegisterAllCallbacks()
 void SDKMinimalClient::TimerPosesCallback()
 {
     // check if there is new data available.
+
     m_RawSkeletonMutex.lock();
-
-    delete m_RawSkeleton;
-    m_RawSkeleton = m_NextRawSkeleton;
-    m_NextRawSkeleton = nullptr;
-
+    for (auto &[_, gloveData]: m_GloveDataMap) {
+        if (gloveData.nextRawSkeleton) {
+            gloveData.rawSkeleton = std::move(gloveData.nextRawSkeleton);
+            gloveData.nextRawSkeleton.reset();
+        }
+    }
     m_RawSkeletonMutex.unlock();
 
-    if (m_RawSkeleton != nullptr && m_RawSkeleton->skeletons.size() != 0)
-    {
-        // print whenever new data is available
-        ClientLog::print("raw skeleton data obtained for frame: {}.", std::to_string(m_FrameCounter));
-        m_FrameCounter++;
+    for (const auto &[gloveId, gloveData]: m_GloveDataMap) {
+        if (!gloveData.rawSkeleton || gloveData.rawSkeleton->skeletons.empty())
+            continue;
 
         manus_ros2_msgs::msg::ManusNodePoses msg;
-        msg.glove_id = m_RawSkeleton->skeletons[0].info.gloveId;
-        msg.node_count = (int) m_RawSkeleton->skeletons[0].info.nodesCount;
+        msg.glove_id = gloveData.rawSkeleton->skeletons[0].info.gloveId;
+        msg.node_count = (int) gloveData.rawSkeleton->skeletons[0].info.nodesCount;
 
-        for (const auto& node : m_RawSkeleton->skeletons[0].nodes)
-        {
+        for (const auto &node: gloveData.rawSkeleton->skeletons[0].nodes) {
             // prints the position and rotation of the first node in the first skeleton
             ManusVec3 t_Pos = node.transform.position;
             ManusQuaternion t_Rot = node.transform.rotation;
 
             msg.node_ids.push_back(node.id);
 
-            auto& pose = msg.poses.emplace_back();
+            auto &pose = msg.poses.emplace_back();
             pose.position.x = t_Pos.x;
             pose.position.y = t_Pos.y;
             pose.position.z = t_Pos.z;
@@ -254,15 +238,17 @@ void SDKMinimalClient::TimerPosesCallback()
             pose.orientation.w = t_Rot.w;
         }
 
-        ClientLog::print("node pose message published.");
-        m_NodePosePublisher->publish(msg);
+        ClientLog::print("node pose message published: {}", gloveId);
+        gloveData.nodePosesPub->publish(msg);
     }
 }
 
 void SDKMinimalClient::TimerHierarchyCallback()
 {
-    if (m_RawSkeleton != nullptr && m_RawSkeleton->skeletons.size() != 0)
-    {
+    for (const auto &[gloveId, gloveData]: m_GloveDataMap) {
+        if (!gloveData.rawSkeleton || gloveData.rawSkeleton->skeletons.empty())
+            continue;
+
         // this section demonstrates how to interpret the raw skeleton data.
         // how to get the hierarchy of the skeleton, and how to know bone each node represents.
 
@@ -271,13 +257,12 @@ void SDKMinimalClient::TimerHierarchyCallback()
         uint32_t t_GloveId = 0;
         uint32_t t_NodeCount = 0;
 
-        t_GloveId = m_RawSkeleton->skeletons[0].info.gloveId;
+        t_GloveId = gloveData.rawSkeleton->skeletons[0].info.gloveId;
         t_NodeCount = 0;
 
         SDKReturnCode t_Result = CoreSdk_GetRawSkeletonNodeCount(t_GloveId, t_NodeCount);
-        if (t_Result != SDKReturnCode::SDKReturnCode_Success)
-        {
-            ClientLog::error("Failed to get Raw Skeleton Node Count. The error given was {}.", (int32_t)t_Result);
+        if (t_Result != SDKReturnCode::SDKReturnCode_Success) {
+            ClientLog::error("Failed to get Raw Skeleton Node Count. The error given was {}.", (int32_t) t_Result);
             return;
         }
 
@@ -288,19 +273,16 @@ void SDKMinimalClient::TimerHierarchyCallback()
 
         NodeInfo *t_NodeInfo = new NodeInfo[t_NodeCount];
         t_Result = CoreSdk_GetRawSkeletonNodeInfoArray(t_GloveId, t_NodeInfo, t_NodeCount);
-        if (t_Result != SDKReturnCode::SDKReturnCode_Success)
-        {
-            ClientLog::error("Failed to get Raw Skeleton Hierarchy. The error given was {}.", (int32_t)t_Result);
+        if (t_Result != SDKReturnCode::SDKReturnCode_Success) {
+            ClientLog::error("Failed to get Raw Skeleton Hierarchy. The error given was {}.", (int32_t) t_Result);
             return;
         }
 
-        for (int i = 0; i < t_NodeCount; ++i)
-        {
+        for (int i = 0; i < t_NodeCount; ++i) {
             // skip invalid nodes
             if (t_NodeInfo[i].side == Side_Invalid ||
                 t_NodeInfo[i].chainType == ChainType_Invalid ||
-                t_NodeInfo[i].fingerJointType == FingerJointType_Invalid)
-            {
+                t_NodeInfo[i].fingerJointType == FingerJointType_Invalid) {
                 continue;
             }
 
@@ -308,10 +290,10 @@ void SDKMinimalClient::TimerHierarchyCallback()
             msg.parent_node_ids.push_back(t_NodeInfo[i].parentId);
             // prints the position and rotation of the first node in the first skeleton
 
-            ManusVec3 t_Pos = m_RawSkeleton->skeletons[0].nodes[i].transform.position;
-            ManusQuaternion t_Rot = m_RawSkeleton->skeletons[0].nodes[i].transform.rotation;
+            ManusVec3 t_Pos = gloveData.rawSkeleton->skeletons[0].nodes[i].transform.position;
+            ManusQuaternion t_Rot = gloveData.rawSkeleton->skeletons[0].nodes[i].transform.rotation;
 
-            auto& pose = msg.poses.emplace_back();
+            auto &pose = msg.poses.emplace_back();
             pose.position.x = t_Pos.x;
             pose.position.y = t_Pos.y;
             pose.position.z = t_Pos.z;
@@ -323,8 +305,8 @@ void SDKMinimalClient::TimerHierarchyCallback()
 
         msg.node_count = (int) msg.node_ids.size();
 
-        ClientLog::print("node hierarchy message published.");
-        m_NodeHierarchyPublisher->publish(msg);
+        ClientLog::print("node hierarchy message published: {}", gloveId);
+        gloveData.nodeHierarchyPub->publish(msg);
 
         delete[] t_NodeInfo;
     }
@@ -335,20 +317,17 @@ ClientReturnCode SDKMinimalClient::Connect()
 {
     bool t_ConnectLocally = m_ConnectionType == ConnectionType::ConnectionType_Local;
     SDKReturnCode t_StartResult = CoreSdk_LookForHosts(1, t_ConnectLocally);
-    if (t_StartResult != SDKReturnCode::SDKReturnCode_Success)
-    {
+    if (t_StartResult != SDKReturnCode::SDKReturnCode_Success) {
         return ClientReturnCode::ClientReturnCode_FailedToFindHosts;
     }
 
     uint32_t t_NumberOfHostsFound = 0;
     SDKReturnCode t_NumberResult = CoreSdk_GetNumberOfAvailableHostsFound(&t_NumberOfHostsFound);
-    if (t_NumberResult != SDKReturnCode::SDKReturnCode_Success)
-    {
+    if (t_NumberResult != SDKReturnCode::SDKReturnCode_Success) {
         return ClientReturnCode::ClientReturnCode_FailedToFindHosts;
     }
 
-    if (t_NumberOfHostsFound == 0)
-    {
+    if (t_NumberOfHostsFound == 0) {
         return ClientReturnCode::ClientReturnCode_FailedToFindHosts;
     }
 
@@ -356,17 +335,14 @@ ClientReturnCode SDKMinimalClient::Connect()
     t_AvailableHosts.reset(new ManusHost[t_NumberOfHostsFound]);
 
     SDKReturnCode t_HostsResult = CoreSdk_GetAvailableHostsFound(t_AvailableHosts.get(), t_NumberOfHostsFound);
-    if (t_HostsResult != SDKReturnCode::SDKReturnCode_Success)
-    {
+    if (t_HostsResult != SDKReturnCode::SDKReturnCode_Success) {
         return ClientReturnCode::ClientReturnCode_FailedToFindHosts;
     }
 
     uint32_t t_HostSelection = 0;
-    if (!t_ConnectLocally && t_NumberOfHostsFound > 1)
-    {
+    if (!t_ConnectLocally && t_NumberOfHostsFound > 1) {
         ClientLog::print("Select which host you want to connect to (and press enter to submit)");
-        for (size_t i = 0; i < t_NumberOfHostsFound; i++)
-        {
+        for (size_t i = 0; i < t_NumberOfHostsFound; i++) {
             auto t_HostInfo = t_AvailableHosts[i];
             ClientLog::print("[{}] hostname: {}, IP address: {}, version {}.{}.{}", i + 1, t_HostInfo.hostName,
                              t_HostInfo.ipAddress, t_HostInfo.manusCoreVersion.major, t_HostInfo.manusCoreVersion.minor,
@@ -382,8 +358,7 @@ ClientReturnCode SDKMinimalClient::Connect()
 
     SDKReturnCode t_ConnectResult = CoreSdk_ConnectToHost(t_AvailableHosts[t_HostSelection]);
 
-    if (t_ConnectResult == SDKReturnCode::SDKReturnCode_NotConnected)
-    {
+    if (t_ConnectResult == SDKReturnCode::SDKReturnCode_NotConnected) {
         return ClientReturnCode::ClientReturnCode_FailedToConnect;
     }
 
@@ -395,13 +370,11 @@ ClientReturnCode SDKMinimalClient::Connect()
 /// The data is not directly passed to the callback, but needs to be retrieved from the SDK for it to be used. This is demonstrated in the function below.
 void SDKMinimalClient::OnRawSkeletonStreamCallback(const SkeletonStreamInfo *const p_RawSkeletonStreamInfo)
 {
-    if (s_Instance)
-    {
+    if (s_Instance) {
         ClientRawSkeletonCollection *t_NxtClientRawSkeleton = new ClientRawSkeletonCollection();
         t_NxtClientRawSkeleton->skeletons.resize(p_RawSkeletonStreamInfo->skeletonsCount);
 
-        for (uint32_t i = 0; i < p_RawSkeletonStreamInfo->skeletonsCount; i++)
-        {
+        for (uint32_t i = 0; i < p_RawSkeletonStreamInfo->skeletonsCount; i++) {
             // Retrieves info on the skeletonData, like deviceID and the amount of nodes.
             CoreSdk_GetRawSkeletonInfo(i, &t_NxtClientRawSkeleton->skeletons[i].info);
             t_NxtClientRawSkeleton->skeletons[i].nodes.resize(t_NxtClientRawSkeleton->skeletons[i].info.nodesCount);
@@ -411,10 +384,28 @@ void SDKMinimalClient::OnRawSkeletonStreamCallback(const SkeletonStreamInfo *con
             CoreSdk_GetRawSkeletonData(i, t_NxtClientRawSkeleton->skeletons[i].nodes.data(),
                                        t_NxtClientRawSkeleton->skeletons[i].info.nodesCount);
         }
+
+        // retrieve glove id
+        const auto &rawSkeleton = t_NxtClientRawSkeleton;
+        uint32_t t_GloveId = rawSkeleton->skeletons[0].info.gloveId;
+
+        auto &gloveDataMap = s_Instance->m_GloveDataMap;
         s_Instance->m_RawSkeletonMutex.lock();
-        if (s_Instance->m_NextRawSkeleton != nullptr)
-            delete s_Instance->m_NextRawSkeleton;
-        s_Instance->m_NextRawSkeleton = t_NxtClientRawSkeleton;
+
+        // create new publishers for new glove
+        if (gloveDataMap.find(t_GloveId) == gloveDataMap.end()) {
+            auto gloveIndex = gloveDataMap.size();
+            auto iter = gloveDataMap.emplace(t_GloveId, GloveRawSkeletonData{}).first;
+
+            iter->second.nodeHierarchyPub = s_Instance->create_publisher<manus_ros2_msgs::msg::ManusNodeHierarchy>(
+                "manus_node_hierarchy_" + std::to_string(gloveIndex), 10);
+            iter->second.nodePosesPub = s_Instance->create_publisher<manus_ros2_msgs::msg::ManusNodePoses>(
+                "manus_node_poses_" + std::to_string(gloveIndex), 10);
+        }
+
+        // fetch new data
+        gloveDataMap[t_GloveId].nextRawSkeleton = std::unique_ptr<ClientRawSkeletonCollection>(t_NxtClientRawSkeleton);
+
         s_Instance->m_RawSkeletonMutex.unlock();
     }
 }
