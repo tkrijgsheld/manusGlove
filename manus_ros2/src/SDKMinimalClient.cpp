@@ -280,9 +280,7 @@ void SDKMinimalClient::TimerHierarchyCallback()
 
         for (int i = 0; i < t_NodeCount; ++i) {
             // skip invalid nodes
-            if (t_NodeInfo[i].side == Side_Invalid ||
-                t_NodeInfo[i].chainType == ChainType_Invalid ||
-                t_NodeInfo[i].fingerJointType == FingerJointType_Invalid) {
+            if (t_NodeInfo[i].side == Side_Invalid || t_NodeInfo[i].chainType == ChainType_Invalid) {
                 continue;
             }
 
