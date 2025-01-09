@@ -1,4 +1,6 @@
 import copy
+import sys
+import threading
 from pathlib import Path
 
 import mink
@@ -7,6 +9,7 @@ import mujoco.viewer
 import numpy as np
 import open3d as o3d
 import rclpy
+from loop_rate_limiters import RateLimiter
 from manus_ros2_msgs.msg import ManusNodeHierarchy, ManusNodePoses
 from rclpy.node import Node
 
@@ -65,36 +68,40 @@ class HandControl:
         self.target_updated = False
         self.raw_targets = None
 
+        self.lock = threading.Lock()
+
     def update_target(self, finger_positions):
-        self.target_updated = True
-        self.raw_targets = copy.deepcopy(finger_positions)
+        with self.lock:
+            self.target_updated = True
+            self.raw_targets = copy.deepcopy(finger_positions)
 
-        # Update task target.
-        for finger, task in zip(self.fingers, self.finger_tasks):
-            task.set_target(mink.SE3.from_translation(finger_positions[finger]))
+            # Update task target.
+            for finger, task in zip(self.fingers, self.finger_tasks):
+                task.set_target(mink.SE3.from_translation(finger_positions[finger]))
 
-        vel = mink.solve_ik(self.configuration, self.tasks, self.dt, self.solver, 1e-5)
-        self.configuration.integrate_inplace(vel, self.dt)
-        mujoco.mj_camlight(self.model, self.data)
+            vel = mink.solve_ik(self.configuration, self.tasks, self.dt, self.solver, 1e-5)
+            self.configuration.integrate_inplace(vel, self.dt)
+            mujoco.mj_camlight(self.model, self.data)
 
     def step(self):
-        mujoco.mj_step(self.model, self.data)
+        with self.lock:
+            mujoco.mj_step(self.model, self.data)
 
-        if self.target_updated:
-            # visualize targets
-            self.viewer.user_scn.ngeom = 0
-            for i, target in enumerate(self.raw_targets.values()):
-                mujoco.mjv_initGeom(
-                    self.viewer.user_scn.geoms[i],
-                    type=mujoco.mjtGeom.mjGEOM_SPHERE,
-                    size=[0.01, 0, 0],
-                    pos=target,
-                    mat=np.eye(3).flatten(),
-                    rgba=[1, 0.2, 0.7, 1],
-                )
-            self.viewer.user_scn.ngeom = i + 1
+            if self.target_updated:
+                # visualize targets
+                self.viewer.user_scn.ngeom = 0
+                for i, target in enumerate(self.raw_targets.values()):
+                    mujoco.mjv_initGeom(
+                        self.viewer.user_scn.geoms[i],
+                        type=mujoco.mjtGeom.mjGEOM_SPHERE,
+                        size=[0.01, 0, 0],
+                        pos=target,
+                        mat=np.eye(3).flatten(),
+                        rgba=[1, 0.2, 0.7, 1],
+                    )
+                self.viewer.user_scn.ngeom = i + 1
 
-        self.viewer.sync()
+            self.viewer.sync()
 
 
 class GloveViz:
@@ -111,7 +118,7 @@ class GloveViz:
 
 
 class MinimalSubscriber(Node):
-    def __init__(self):
+    def __init__(self, hand_control: HandControl):
         super().__init__("manus_ros2_client_py")
 
         self.sub_poses = self.create_subscription(
@@ -142,7 +149,7 @@ class MinimalSubscriber(Node):
         self.timer = self.create_timer(0.02, self.timer_callback)
         self.glove_viz_map: dict[str, GloveViz] = {}
 
-        self.hand_ctl = HandControl()
+        self.hand_ctl = hand_control
 
     def node_callback(self, msg: ManusNodePoses):
         if msg.glove_id not in self.glove_viz_map:
@@ -288,14 +295,11 @@ class MinimalSubscriber(Node):
             glove_viz.viz.poll_events()
             glove_viz.viz.update_renderer()
 
-        self.hand_ctl.step()
 
+def spin_node(hand_control):
+    rclpy.init(args=sys.argv)
 
-def main(args=None):
-    rclpy.init(args=args)
-
-    minimal_subscriber = MinimalSubscriber()
-
+    minimal_subscriber = MinimalSubscriber(hand_control)
     rclpy.spin(minimal_subscriber)
 
     # Destroy the node explicitly
@@ -303,6 +307,18 @@ def main(args=None):
     # when the garbage collector destroys the node object)
     minimal_subscriber.destroy_node()
     rclpy.shutdown()
+
+
+def main():
+    hand_control = HandControl()
+
+    spin_thread = threading.Thread(target=spin_node, daemon=True, args=(hand_control,))
+    spin_thread.start()
+
+    rate = RateLimiter(frequency=1.0 / hand_control.model.opt.timestep * 0.5, warn=False)
+    while hand_control.viewer.is_running():
+        hand_control.step()
+        rate.sleep()
 
 
 if __name__ == "__main__":
