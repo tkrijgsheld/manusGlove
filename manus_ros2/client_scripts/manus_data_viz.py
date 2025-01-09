@@ -50,14 +50,13 @@ class HandControl:
             show_right_ui=False,
         )
         mujoco.mjv_defaultFreeCamera(self.model, self.viewer.cam)
-        self.configuration.update_from_keyframe("grasp hard")
+        # self.configuration.update_from_keyframe("open hand")
 
         # Initialize mocap bodies at their respective sites.
-        posture_task.set_target_from_configuration(self.configuration)
-        for finger in self.fingers:
-            mink.move_mocap_to_frame(self.model, self.data, f"{finger}_target", finger, "site")
+        # posture_task.set_target_from_configuration(self.configuration)
+        # for finger in self.fingers:
+        #     mink.move_mocap_to_frame(self.model, self.data, f"{finger}_target", finger, "site")
 
-        self.dt = self.model.opt.timestep
         # print("timestep:", self.dt)
 
         self.viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE
@@ -69,25 +68,26 @@ class HandControl:
         self.raw_targets = None
 
         self.lock = threading.Lock()
+        self.rate = RateLimiter(frequency=100.0, warn=False)
 
     def update_target(self, finger_positions):
         with self.lock:
             self.target_updated = True
             self.raw_targets = copy.deepcopy(finger_positions)
 
-            # Update task target.
-            for finger, task in zip(self.fingers, self.finger_tasks):
-                task.set_target(mink.SE3.from_translation(finger_positions[finger]))
-
-            vel = mink.solve_ik(self.configuration, self.tasks, self.dt, self.solver, 1e-5)
-            self.configuration.integrate_inplace(vel, self.dt)
-            mujoco.mj_camlight(self.model, self.data)
-
-    def step(self):
+    def step(self, dt):
         with self.lock:
-            mujoco.mj_step(self.model, self.data)
-
             if self.target_updated:
+                # Update task target.
+                for finger, task in zip(self.fingers, self.finger_tasks):
+                    task.set_target(mink.SE3.from_translation(self.raw_targets[finger]))
+
+                # print(self.data.body("maniobj"))
+                vel = mink.solve_ik(self.configuration, self.tasks, dt, self.solver, 1e-5)
+                self.configuration.integrate_inplace(vel, dt)
+
+                mujoco.mj_camlight(self.model, self.data)
+
                 # visualize targets
                 self.viewer.user_scn.ngeom = 0
                 for i, target in enumerate(self.raw_targets.values()):
@@ -101,6 +101,8 @@ class HandControl:
                     )
                 self.viewer.user_scn.ngeom = i + 1
 
+            # step environment
+            mujoco.mj_step(self.model, self.data)
             self.viewer.sync()
 
 
@@ -315,9 +317,9 @@ def main():
     spin_thread = threading.Thread(target=spin_node, daemon=True, args=(hand_control,))
     spin_thread.start()
 
-    rate = RateLimiter(frequency=1.0 / hand_control.model.opt.timestep * 0.5, warn=False)
+    rate = RateLimiter(frequency=100.0, warn=False)
     while hand_control.viewer.is_running():
-        hand_control.step()
+        hand_control.step(rate.dt)
         rate.sleep()
 
 
