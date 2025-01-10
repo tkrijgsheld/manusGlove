@@ -2,6 +2,8 @@
 
 This is a basic ROS2 driver for [Manus Glove](https://www.manus-meta.com/products/quantum-metagloves). It broadcasts raw skeleton data as ROS2 messages.
 
+![manus](https://github.com/user-attachments/assets/953ddc6b-aaf9-43a9-b369-875bac770406)
+
 ### How to Use
 
 We tested the driver on Ubuntu 22.04 and ROS2 Humble. It should work with similar environments as well. Here's things you need to do before using it:
