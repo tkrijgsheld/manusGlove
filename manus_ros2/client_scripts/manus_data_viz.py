@@ -17,11 +17,13 @@ SHADOW_HAND_XML = f"{Path(__file__).parent.as_posix()}/mink_repo/examples/shadow
 
 
 class HandControl:
+    """class for controlling the shadow hand in mujoco"""
+
     def __init__(self):
         self.model = mujoco.MjModel.from_xml_path(SHADOW_HAND_XML)
         self.configuration = mink.Configuration(self.model)
-        posture_task = mink.PostureTask(self.model, cost=1e-2)
 
+        # set up finger target reaching tasks
         self.fingers = ["thumb", "first", "middle", "ring", "little"]
         self.finger_tasks: list[mink.FrameTask] = []
         for finger in self.fingers:
@@ -35,7 +37,6 @@ class HandControl:
             self.finger_tasks.append(task)
 
         self.tasks = [
-            # posture_task,
             *self.finger_tasks,
         ]
 
@@ -43,6 +44,7 @@ class HandControl:
         self.data = self.configuration.data
         self.solver = "quadprog"
 
+        # launch mujoco viewer
         self.viewer = mujoco.viewer.launch_passive(
             model=self.model,
             data=self.data,
@@ -59,6 +61,7 @@ class HandControl:
 
         # print("timestep:", self.dt)
 
+        # visualize mujoco sites
         self.viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE
         self.viewer.opt.label = mujoco.mjtLabel.mjLABEL_SITE
         self.viewer.opt.sitegroup[4] = 1
@@ -67,16 +70,19 @@ class HandControl:
         self.target_updated = False
         self.raw_targets = None
 
+        # lock for multi-threading
         self.lock = threading.Lock()
         self.rate = RateLimiter(frequency=100.0, warn=False)
 
     def update_target(self, finger_positions):
+        """update finger tip target positions"""
         with self.lock:
             self.target_updated = True
             self.raw_targets = copy.deepcopy(finger_positions)
 
     def step(self, dt):
         with self.lock:
+            # run inverse kinematics to reach the target
             if self.target_updated:
                 # Update task target.
                 for finger, task in zip(self.fingers, self.finger_tasks):
@@ -107,6 +113,8 @@ class HandControl:
 
 
 class GloveViz:
+    """open3d visualization for glove data"""
+
     def __init__(self, glove_id):
         self.viz = o3d.visualization.Visualizer()
         self.viz.create_window()
@@ -123,6 +131,9 @@ class MinimalSubscriber(Node):
     def __init__(self, hand_control: HandControl):
         super().__init__("manus_ros2_client_py")
 
+        # subscribe to glove data topics
+        # /manus_node_poses_X: poses for all nodes on the glove
+        # /manus_node_hierarchy_X: hierarchy of nodes on the glove
         self.sub_poses = self.create_subscription(
             ManusNodePoses,
             "/manus_node_poses_0",
@@ -135,18 +146,6 @@ class MinimalSubscriber(Node):
             self.hierarchy_callback,
             20,
         )
-        self.sub_poses = self.create_subscription(
-            ManusNodePoses,
-            "/manus_node_poses_1",
-            self.node_callback,
-            20,
-        )
-        self.sub_hierarchies = self.create_subscription(
-            ManusNodeHierarchy,
-            "/manus_node_hierarchy_1",
-            self.hierarchy_callback,
-            20,
-        )
 
         self.timer = self.create_timer(0.02, self.timer_callback)
         self.glove_viz_map: dict[str, GloveViz] = {}
@@ -154,6 +153,7 @@ class MinimalSubscriber(Node):
         self.hand_ctl = hand_control
 
     def node_callback(self, msg: ManusNodePoses):
+        """callback for glove node poses"""
         if msg.glove_id not in self.glove_viz_map:
             return
 
@@ -207,7 +207,6 @@ class MinimalSubscriber(Node):
                 np.array([pose.position.x, pose.position.y, pose.position.z]),
             )
 
-            # manus (x, y, z) -> mujoco (-y, -z, x)
             # thumb: 24
             if node_id == 24:
                 pos = root_pose.inverse().multiply(tip_pose).translation()
@@ -249,6 +248,9 @@ class MinimalSubscriber(Node):
         # print(tip_positions)
 
     def hierarchy_callback(self, msg: ManusNodeHierarchy):
+        """callback for glove node hierarchy"""
+
+        # add a new glove visualization
         if msg.glove_id not in self.glove_viz_map:
             glove_viz = GloveViz(msg.glove_id)
 
@@ -276,6 +278,7 @@ class MinimalSubscriber(Node):
                     frame_mesh.translate([pose.position.x, pose.position.y, pose.position.z], relative=False)
                     glove_viz.viz.add_geometry(frame_mesh)
 
+            # draw glove skeletons
             points = [[pose.position.x, pose.position.y, pose.position.z] for pose in msg.poses]
             node_id_to_index = {node_id: i for i, node_id in enumerate(msg.node_ids)}
             lines = [
