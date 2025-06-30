@@ -1,8 +1,4 @@
 ManusSDK
-ManusSDK.h
-ManusSDKTypes.h
-ManusSDKTypeInitializers.h
-ClientLogging.hpp
 build
 cmake-build-*
 install
