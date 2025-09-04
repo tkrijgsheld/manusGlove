@@ -48,8 +48,8 @@ class HandControl:
         self.viewer = mujoco.viewer.launch_passive(
             model=self.model,
             data=self.data,
-            show_left_ui=False,
-            show_right_ui=False,
+            # show_left_ui=False,
+            # show_right_ui=False,
         )
         mujoco.mjv_defaultFreeCamera(self.model, self.viewer.cam)
         # self.configuration.update_from_keyframe("open hand")
@@ -62,8 +62,11 @@ class HandControl:
         # print("timestep:", self.dt)
 
         # visualize mujoco sites
-        self.viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE
-        self.viewer.opt.label = mujoco.mjtLabel.mjLABEL_SITE
+        # self.viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE
+        # self.viewer.opt.label = mujoco.mjtLabel.mjLABEL_SITE
+        # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 1
+        self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = 1
+        self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 1
         self.viewer.opt.sitegroup[4] = 1
         self.viewer.sync()
 
@@ -95,17 +98,17 @@ class HandControl:
                 mujoco.mj_camlight(self.model, self.data)
 
                 # visualize targets
-                self.viewer.user_scn.ngeom = 0
-                for i, target in enumerate(self.raw_targets.values()):
-                    mujoco.mjv_initGeom(
-                        self.viewer.user_scn.geoms[i],
-                        type=mujoco.mjtGeom.mjGEOM_SPHERE,
-                        size=[0.01, 0, 0],
-                        pos=target,
-                        mat=np.eye(3).flatten(),
-                        rgba=[1, 0.2, 0.7, 1],
-                    )
-                self.viewer.user_scn.ngeom = i + 1
+                # self.viewer.user_scn.ngeom = 0
+                # for i, target in enumerate(self.raw_targets.values()):
+                #     mujoco.mjv_initGeom(
+                #         self.viewer.user_scn.geoms[i],
+                #         type=mujoco.mjtGeom.mjGEOM_SPHERE,
+                #         size=[0.01, 0, 0],
+                #         pos=target,
+                #         mat=np.eye(3).flatten(),
+                #         rgba=[1, 0.2, 0.7, 1],
+                #     )
+                # self.viewer.user_scn.ngeom = i + 1
 
             # step environment
             mujoco.mj_step(self.model, self.data)
