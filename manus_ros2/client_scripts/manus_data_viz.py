@@ -62,7 +62,7 @@ class HandControl:
         # print("timestep:", self.dt)
 
         # visualize mujoco sites
-        # self.viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE
+        self.viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE
         # self.viewer.opt.label = mujoco.mjtLabel.mjLABEL_SITE
         # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 1
         self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = 1
@@ -109,6 +109,8 @@ class HandControl:
                 #         rgba=[1, 0.2, 0.7, 1],
                 #     )
                 # self.viewer.user_scn.ngeom = i + 1
+
+            # self.model.body("lh_forearm").pos += [0.000, 0.000, 0.0001] # Replace with some pos from my aruco marker detection
 
             # step environment
             mujoco.mj_step(self.model, self.data)
