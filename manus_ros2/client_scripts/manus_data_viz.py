@@ -12,7 +12,7 @@ import open3d as o3d
 import rclpy
 from loop_rate_limiters import RateLimiter
 from manus_ros2_msgs.msg import ManusNodeHierarchy, ManusNodePoses
-from std_msgs.msg import Float64MultiArray
+from geometry_msgs.msg import Pose
 
 from rclpy.node import Node
 
@@ -72,7 +72,7 @@ class HandControl:
         # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 1
         # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = 1
         # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 1
-        
+
         self.viewer.opt.sitegroup[4] = 1
         self.viewer.sync()
 
@@ -106,21 +106,21 @@ class HandControl:
                 mujoco.mj_camlight(self.model, self.data)
 
                 # visualize targets
-                # self.viewer.user_scn.ngeom = 0
-                # for i, target in enumerate(self.raw_targets.values()):
-                #     mujoco.mjv_initGeom(
-                #         self.viewer.user_scn.geoms[i],
-                #         type=mujoco.mjtGeom.mjGEOM_SPHERE,
-                #         size=[0.01, 0, 0],
-                #         pos=target,
-                #         mat=np.eye(3).flatten(),
-                #         rgba=[1, 0.2, 0.7, 1],
-                #     )
-                # self.viewer.user_scn.ngeom = i + 1
+                self.viewer.user_scn.ngeom = 0
+                for i, target in enumerate(self.raw_targets.values()):
+                    mujoco.mjv_initGeom(
+                        self.viewer.user_scn.geoms[i],
+                        type=mujoco.mjtGeom.mjGEOM_SPHERE,
+                        size=[0.01, 0, 0],
+                        pos=target,
+                        mat=np.eye(3).flatten(),
+                        rgba=[1, 0.2, 0.7, 1],
+                    )
+                self.viewer.user_scn.ngeom = i + 1
 
-            print(self.model.body("lh_forearm").pos)
+            # print(self.model.body("lh_forearm").pos)
             self.model.body("lh_forearm").pos = self.pos_from_cam # Replace with some pos from my aruco marker detection
-            self.model.body("lh_forearm").quat = self.rot_from_cam
+            # self.model.body("lh_forearm").quat = self.rot_from_cam
 
             # step environment
             mujoco.mj_step(self.model, self.data)
@@ -162,7 +162,7 @@ class MinimalSubscriber(Node):
             20,
         )
         self.sub_cam_poses = self.create_subscription(
-            Float64MultiArray,
+            Pose,
             "camera_pose",
             self.cam_callback,
             20,
@@ -316,19 +316,13 @@ class MinimalSubscriber(Node):
 
             self.glove_viz_map[msg.glove_id] = glove_viz
 
-    def cam_callback(self, msg: Float64MultiArray):
+    def cam_callback(self, msg: Pose):
         """callback for camera pose"""
-        if len(msg.data) != 7:
-            self.hand_ctl.pos_from_cam = np.zeros(3)
-            self.hand_ctl.rot_from_cam = np.zeros(4)
-            return
 
         # update hand position and orientation based on camera pose
-        rot_vec = np.array([msg.data[0], msg.data[1], msg.data[2], msg.data[3]])
-        pos = np.array([msg.data[4], msg.data[5], msg.data[6]])
-        # print("Camera pose:", pos, rot_vec)
-        self.hand_ctl.pos_from_cam = pos
-        self.hand_ctl.rot_from_cam = rot_vec
+        print("pos:", msg.position.x, msg.position.y, msg.position.z, "quat:", msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z)
+        self.hand_ctl.pos_from_cam = [msg.position.x, msg.position.y, msg.position.z]
+        self.hand_ctl.rot_from_cam = [msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z]
 
     def timer_callback(self):
         for glove_viz in self.glove_viz_map.values():

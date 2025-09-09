@@ -5,7 +5,7 @@ import scipy.spatial.transform.rotation as rot
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import Float64MultiArray
+from geometry_msgs.msg import Pose, Point, Quaternion
 
 MARKER_LENGTH = 0.05
 
@@ -13,13 +13,21 @@ class MinimalPublisher(Node):
 
     def __init__(self):
         super().__init__('minimal_publisher')
-        self.publisher_ = self.create_publisher(Float64MultiArray, 'camera_pose', 10)
+        self.publisher_ = self.create_publisher(Pose, 'camera_pose', 10)
     
-    def sendData(self, data):
-        msg = Float64MultiArray()
-        msg.data = data
+    def sendData(self, pos, orientation):
+        msg = Pose()
+        msg.position = Point(
+            x=pos[0],
+            y=pos[1],
+            z=pos[2]
+        )
+        msg.orientation = Quaternion(w = orientation[0],
+                                    x = orientation[1],
+                                    y = orientation[2],
+                                    z = orientation[3])
         self.publisher_.publish(msg)
-        self.get_logger().info('Publishing: "%s"' % msg.data)
+        self.get_logger().info('Publishing: "%s"' % msg)
 
 def load_camera_calibration(calib_file="src/camera_pose/camera_pose/CamData/rgbd.json"):
     """
@@ -96,7 +104,7 @@ def getTransformationCamera(markers):
     rvecCam, _ = cv2.Rodrigues(R_marker_to_camera)
 
     rotation = rot.Rotation.from_matrix(R_marker_to_camera)
-    rvecCam = rotation.as_quat().reshape((4, 1))
+    rvecCam = rotation.as_quat().reshape((4, 1)) # Scalar first = False TODO?
 
     tvecCam = tvec_marker_to_camera.reshape((3, 1))
 
@@ -140,14 +148,15 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, ros2Publisher):
                 cv2.drawFrameAxes(frame, cam_matrix, dist_coeffs, rvec, tvec, MARKER_LENGTH*1.5, 2)
 
         rvecCam, tvecCam = getTransformationCamera(markers)
-        data = []
+        pos = []
+        quat = []
         for i in rvecCam:
-            data.append(float(i))
+            quat.append(float(i))
         for i in tvecCam:
-            data.append(float(i))
-        print(data)
+            pos.append(float(i))
+        print('pos:', pos, 'quat:', quat)
         if ros2Publisher is not None:
-            ros2Publisher.sendData(data)
+            ros2Publisher.sendData(pos, quat)
 
         key = cv2.waitKey(1)
         if key == 27:
