@@ -1,10 +1,7 @@
 import cv2
 import numpy as np
 import json
-import matplotlib.pyplot as plt
-import pylab
-import time
-import argparse
+import scipy.spatial.transform.rotation as rot
 import rclpy
 from rclpy.node import Node
 
@@ -97,6 +94,10 @@ def getTransformationCamera(markers):
     tvec_marker_to_camera = -R_marker_to_camera @ tvec_camera_to_marker
 
     rvecCam, _ = cv2.Rodrigues(R_marker_to_camera)
+
+    rotation = rot.Rotation.from_matrix(R_marker_to_camera)
+    rvecCam = rotation.as_quat().reshape((4, 1))
+
     tvecCam = tvec_marker_to_camera.reshape((3, 1))
 
     return rvecCam.flatten(), tvecCam.flatten()
