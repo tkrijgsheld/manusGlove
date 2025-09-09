@@ -66,10 +66,13 @@ class HandControl:
 
         # visualize mujoco sites
         self.viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE
+
+        # Some options here below
         # self.viewer.opt.label = mujoco.mjtLabel.mjLABEL_SITE
         # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 1
         # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = 1
         # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 1
+        
         self.viewer.opt.sitegroup[4] = 1
         self.viewer.sync()
 
@@ -80,7 +83,7 @@ class HandControl:
         self.lock = threading.Lock()
         self.rate = RateLimiter(frequency=100.0, warn=False)
         self.pos_from_cam = np.zeros(3)
-        self.rot_from_cam = np.zeros(3)
+        self.rot_from_cam = np.zeros(4)
 
     def update_target(self, finger_positions):
         """update finger tip target positions"""
@@ -117,6 +120,7 @@ class HandControl:
 
             print(self.model.body("lh_forearm").pos)
             self.model.body("lh_forearm").pos = self.pos_from_cam # Replace with some pos from my aruco marker detection
+            self.model.body("lh_forearm").quat = self.rot_from_cam
 
             # step environment
             mujoco.mj_step(self.model, self.data)
@@ -314,14 +318,14 @@ class MinimalSubscriber(Node):
 
     def cam_callback(self, msg: Float64MultiArray):
         """callback for camera pose"""
-        if len(msg.data) != 6:
+        if len(msg.data) != 7:
             self.hand_ctl.pos_from_cam = np.zeros(3)
-            self.hand_ctl.rot_from_cam = np.zeros(3)
+            self.hand_ctl.rot_from_cam = np.zeros(4)
             return
 
         # update hand position and orientation based on camera pose
-        rot_vec = np.array([msg.data[0], msg.data[1], msg.data[2]])
-        pos = np.array([msg.data[3], msg.data[4], msg.data[5]])
+        rot_vec = np.array([msg.data[0], msg.data[1], msg.data[2], msg.data[3]])
+        pos = np.array([msg.data[4], msg.data[5], msg.data[6]])
         # print("Camera pose:", pos, rot_vec)
         self.hand_ctl.pos_from_cam = pos
         self.hand_ctl.rot_from_cam = rot_vec
