@@ -16,7 +16,7 @@ class MinimalPublisher(Node):
 
     def __init__(self):
         super().__init__('minimal_publisher')
-        self.publisher_ = self.create_publisher(Float64MultiArray, 'topic', 10)
+        self.publisher_ = self.create_publisher(Float64MultiArray, 'camera_pose', 10)
     
     def sendData(self, data):
         msg = Float64MultiArray()

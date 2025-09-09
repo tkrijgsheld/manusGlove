@@ -3,6 +3,7 @@ import sys
 import threading
 from pathlib import Path
 
+import cv2
 import mink
 import mujoco
 import mujoco.viewer
@@ -11,6 +12,8 @@ import open3d as o3d
 import rclpy
 from loop_rate_limiters import RateLimiter
 from manus_ros2_msgs.msg import ManusNodeHierarchy, ManusNodePoses
+from std_msgs.msg import Float64MultiArray
+
 from rclpy.node import Node
 
 SHADOW_HAND_XML = f"{Path(__file__).parent.as_posix()}/mink_repo/examples/shadow_hand/scene_left.xml"
@@ -65,8 +68,8 @@ class HandControl:
         self.viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE
         # self.viewer.opt.label = mujoco.mjtLabel.mjLABEL_SITE
         # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 1
-        self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = 1
-        self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 1
+        # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = 1
+        # self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 1
         self.viewer.opt.sitegroup[4] = 1
         self.viewer.sync()
 
@@ -76,6 +79,8 @@ class HandControl:
         # lock for multi-threading
         self.lock = threading.Lock()
         self.rate = RateLimiter(frequency=100.0, warn=False)
+        self.pos_from_cam = np.zeros(3)
+        self.rot_from_cam = np.zeros(3)
 
     def update_target(self, finger_positions):
         """update finger tip target positions"""
@@ -110,7 +115,8 @@ class HandControl:
                 #     )
                 # self.viewer.user_scn.ngeom = i + 1
 
-            # self.model.body("lh_forearm").pos += [0.000, 0.000, 0.0001] # Replace with some pos from my aruco marker detection
+            print(self.model.body("lh_forearm").pos)
+            self.model.body("lh_forearm").pos = self.pos_from_cam # Replace with some pos from my aruco marker detection
 
             # step environment
             mujoco.mj_step(self.model, self.data)
@@ -149,6 +155,12 @@ class MinimalSubscriber(Node):
             ManusNodeHierarchy,
             "/manus_node_hierarchy_0",
             self.hierarchy_callback,
+            20,
+        )
+        self.sub_cam_poses = self.create_subscription(
+            Float64MultiArray,
+            "camera_pose",
+            self.cam_callback,
             20,
         )
 
@@ -299,6 +311,20 @@ class MinimalSubscriber(Node):
             glove_viz.line_sets = line_sets
 
             self.glove_viz_map[msg.glove_id] = glove_viz
+
+    def cam_callback(self, msg: Float64MultiArray):
+        """callback for camera pose"""
+        if len(msg.data) != 6:
+            self.hand_ctl.pos_from_cam = np.zeros(3)
+            self.hand_ctl.rot_from_cam = np.zeros(3)
+            return
+
+        # update hand position and orientation based on camera pose
+        rot_vec = np.array([msg.data[0], msg.data[1], msg.data[2]])
+        pos = np.array([msg.data[3], msg.data[4], msg.data[5]])
+        # print("Camera pose:", pos, rot_vec)
+        self.hand_ctl.pos_from_cam = pos
+        self.hand_ctl.rot_from_cam = rot_vec
 
     def timer_callback(self):
         for glove_viz in self.glove_viz_map.values():
