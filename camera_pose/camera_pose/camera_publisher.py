@@ -104,7 +104,7 @@ def getTransformationCamera(markers):
     rvecCam, _ = cv2.Rodrigues(R_marker_to_camera)
 
     rotation = rot.Rotation.from_matrix(R_marker_to_camera)
-    rvecCam = rotation.as_quat().reshape((4, 1)) # Scalar first = False TODO?
+    rvecCam = rotation.as_quat(scalar_first=True).reshape((4, 1))
 
     tvecCam = tvec_marker_to_camera.reshape((3, 1))
 
@@ -154,7 +154,6 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, ros2Publisher):
             quat.append(float(i))
         for i in tvecCam:
             pos.append(float(i))
-        print('pos:', pos, 'quat:', quat)
         if ros2Publisher is not None:
             ros2Publisher.sendData(pos, quat)
 
