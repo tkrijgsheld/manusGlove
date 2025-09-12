@@ -29,7 +29,7 @@ class MinimalPublisher(Node):
         self.publisher_.publish(msg)
         self.get_logger().info('Publishing: "%s"' % msg)
 
-def load_camera_calibration(calib_file="src/camera_pose/camera_pose/CamData/rgbd.json"):
+def load_camera_calibration(calib_file="src/camera_pose/camera_pose/CamData/rgbd_with_screwed_on_thing.json"):
     """
     Load camera calibration parameters from a JSON file. 
     From Shady
@@ -81,13 +81,13 @@ def getTransformationCamera(markers):
     Function to get the transformation from the marker to the camera.
     If multiple markers are detected, the average transformation is returned.
     TODO: Improve this by using a more robust method. Like least squares.
-        Also this is relative to one of the markers, not to the world frame. Right? #TODO
+        Also this is relative to the markers, not to the world frame. Right? #TODO
 
     Parameters:
         markers: List of dictionaries containing a rotation vector and a translation vector
 
     Returns:
-        rvecCam: Rotation vector from marker to camera
+        rvecCam: Rotation vector from marker to camera in quaternion format (w, x, y, z)
         tvecCam: Translation vector from marker to camera
     """
     if len(markers) == 0:
@@ -171,7 +171,7 @@ def main(ros2Publisher=None):
 
     camera_matrix, dist_coeffs = load_camera_calibration()
 
-    video_capture = cv2.VideoCapture(0) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
+    video_capture = cv2.VideoCapture(6) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
     parameters = cv2.aruco.DetectorParameters()
