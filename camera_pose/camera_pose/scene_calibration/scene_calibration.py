@@ -166,16 +166,28 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info):
         elif key == 32:
             save_markers = True
 
+def average_quaternions(quaternions):
+    """
+    Compute the average quaternion using the method of Markley et al.
+    quaternions: Nx4 numpy array
+    Returns: 4-element numpy array (average quaternion)
+    """
+    A = np.zeros((4, 4))
+    for q in quaternions:
+        q = np.array(q, dtype=np.float64).reshape(4, 1)
+        A += q @ q.T
+    # Get the eigenvector corresponding to the largest eigenvalue
+    eigvals, eigvecs = np.linalg.eigh(A)
+    avg_quat = eigvecs[:, np.argmax(eigvals)]
+    # Ensure the quaternion has positive scalar part
+    if avg_quat[0] < 0:
+        avg_quat = -avg_quat
+    return avg_quat
+
 def leastSquaresMarkers(marker_info):
     """
     Function to average the marker positions over multiple frames.
-    This is a simple implementation, that just averages the positions.
-    A more robust implementation could be done using a least squares approach.
-
-    Parameters:
-        marker_info: List of lists of dictionaries containing the marker positions
-    Returns:
-        averaged_markers: List of dictionaries containing the averaged marker positions
+    Uses least squares for quaternion averaging.
     """
     marker_dict = {}
     for frame in marker_info:
@@ -191,9 +203,7 @@ def leastSquaresMarkers(marker_info):
         tvecs = np.array(data["tvecs"])
         quats = np.array(data["quats"])
         avg_tvec = np.mean(tvecs, axis=0).tolist()
-        avg_quat = np.mean(quats, axis=0)
-        avg_quat /= np.linalg.norm(avg_quat)  # Normalize the quaternion
-        avg_quat = avg_quat.tolist()
+        avg_quat = average_quaternions(quats).tolist()
         averaged_markers.append({"id": id, "tvec": avg_tvec, "quat": avg_quat})
 
     return averaged_markers

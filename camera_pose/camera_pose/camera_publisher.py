@@ -161,6 +161,23 @@ def plotScene(marker_poses, quatCam, tvecCam, ax):
     
     pylab.pause(0.01)
 
+def average_quaternions(quaternions):
+    """
+    Compute the average quaternion using the method of Markley et al.
+    quaternions: Nx4 numpy array
+    Returns: 4-element numpy array (average quaternion)
+    """
+    A = np.zeros((4, 4))
+    for q in quaternions:
+        q = np.array(q, dtype=np.float64).reshape(4, 1)
+        A += q @ q.T
+    # Get the eigenvector corresponding to the largest eigenvalue
+    eigvals, eigvecs = np.linalg.eigh(A)
+    avg_quat = eigvecs[:, np.argmax(eigvals)]
+    # Ensure the quaternion has positive scalar part
+    if avg_quat[0] < 0:
+        avg_quat = -avg_quat
+    return avg_quat
 
 def getPoseCamera(markers, marker_info):
     """
@@ -214,14 +231,10 @@ def getPoseCamera(markers, marker_info):
         return None, None, marker_poses
 
     tvecCam = np.zeros(3)
-    quatCam = np.zeros(4)
-    quatCam[0] = 1 # Initialize as unit quaternion
+    quatCam = average_quaternions([pose["quat"] for pose in cam_poses])
     for pose in cam_poses:
         tvecCam += pose["tvec"]
-        quatCam += pose["quat"]
     tvecCam /= len(cam_poses)
-    quatCam /= len(cam_poses)
-    quatCam /= np.linalg.norm(quatCam)
 
     return quatCam, tvecCam, marker_poses
 
