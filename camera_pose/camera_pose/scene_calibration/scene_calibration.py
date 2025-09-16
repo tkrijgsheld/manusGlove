@@ -19,7 +19,7 @@ parser.add_argument("-v", "--Visualization", help = "Show Output", default=True)
 # Read arguments from command line
 args = parser.parse_args()
 
-def load_camera_calibration(calib_file="camera_pose/camera_pose/CamData/rgbd_with_metal_thing.json"):
+def load_camera_calibration(calib_file="src/camera_pose/camera_pose/CamData/rgbd_with_metal_thing.json"):
     """
     Load camera calibration parameters from a JSON file. 
     From Shady
@@ -44,21 +44,6 @@ def load_camera_calibration(calib_file="camera_pose/camera_pose/CamData/rgbd_wit
 
     return camera_matrix, dist_coeffs
 
-def clearFig(ax):
-    """
-    Clears the figure in order to show only one marker/camera position per frame
-
-    Parameters:
-        ax: figure to clear
-    """
-    ax.cla()
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-    ax.set_xlim(-0.5,0.5)
-    ax.set_ylim(-0.5,0.5)
-    ax.set_zlim(-0.5,0.5)
-
 def getTransformationMatrix(marker):
     """
     Creates transformation matrix from camera to marker
@@ -81,31 +66,18 @@ def getTransformationMatrix(marker):
 
     return T_camera_to_marker
 
-def plotZeroMarker(ax):
-    points = np.array([[-MARKER_LENGTH/2, MARKER_LENGTH/2, 0, 1], 
-                        [MARKER_LENGTH/2, MARKER_LENGTH/2, 0, 1], 
-                        [MARKER_LENGTH/2, -MARKER_LENGTH/2, 0, 1],
-                        [-MARKER_LENGTH/2, -MARKER_LENGTH/2, 0, 1]])
-
-    
-    ax.plot([points[0][0], points[1][0]], [points[0][1], points[1][1]], [points[0][2], points[1][2]], c='b')
-    ax.plot([points[1][0], points[2][0]], [points[1][1], points[2][1]], [points[1][2], points[2][2]], c='b')
-    ax.plot([points[2][0], points[3][0]], [points[2][1], points[3][1]], [points[2][2], points[3][2]], c='b')
-    ax.plot([points[3][0], points[0][0]], [points[3][1], points[0][1]], [points[3][2], points[0][2]], c='b')
-
-def plotScene(markers, ax, save_markers, marker_info = []):
+def computeMarkerInfo(markers, save_markers, marker_info = []):
     """
     Function to plot the scene with the marker 0 at the origin.
     The camera and other markers are plotted relative to marker 0.
     This function only works if marker 0 is detected.
-    #TODO: Make it work if marker 0 is not detected. By first recording the position of the markers relative to marker 0 in a way like this:
-    Create a program to calieate the scene. For the calibration the user has to show marker 0 and then all other markers.
-    The program records the position of all markers relative to marker 0. This program will then use the recordings to compute the positions of the markers
+    
     Parameters:
         markers: List of dictionaries containing a rotation vector and a translation vector
         ax: figure to plot the scene in
+        save_markers: Boolean to save the marker positions
+        marker_info: List to save the marker positions
     """
-    clearFig(ax)
     markerZero = None
     for marker in markers:
         if marker["id"] == 0:
@@ -117,21 +89,9 @@ def plotScene(markers, ax, save_markers, marker_info = []):
         return
 
     markers = [m for m in markers if m["id"] != 0] # Remove all other markers with id 0
-    plotZeroMarker(ax)
     
     T_cam_to_0 = getTransformationMatrix(markerZero)
     T_0_to_cam = np.linalg.inv(T_cam_to_0)
-
-    R_cam = T_0_to_cam[:3, :3]
-    tvec_cam = T_0_to_cam[:3, 3]
-
-    xPoint = R_cam @ np.array([0.1, 0, 0]) + tvec_cam
-    yPoint = R_cam @ np.array([0, 0.1, 0]) + tvec_cam
-    zPoint = R_cam @ np.array([0, 0, 0.1]) + tvec_cam
-    ax.scatter(tvec_cam[0], tvec_cam[1], tvec_cam[2], c='black')
-    ax.plot([tvec_cam[0], xPoint[0]], [tvec_cam[1], xPoint[1]], [tvec_cam[2], xPoint[2]], c='r')
-    ax.plot([tvec_cam[0], yPoint[0]], [tvec_cam[1], yPoint[1]], [tvec_cam[2], yPoint[2]], c='g')
-    ax.plot([tvec_cam[0], zPoint[0]], [tvec_cam[1], zPoint[1]], [tvec_cam[2], zPoint[2]], c='b')
 
     markers_from_0 = []
 
@@ -143,21 +103,9 @@ def plotScene(markers, ax, save_markers, marker_info = []):
         tvec_0_to_marker = T_0_to_marker[:3, 3]
 
         quat_0_to_marker = rot.from_matrix(R_0_to_marker).as_quat()
-        if save_markers: # Find some way to safe for only select frames
+        if save_markers:
             print(f"Saving marker {marker['id']}")
             markers_from_0.append({"id": int(marker["id"]), "tvec": tvec_0_to_marker.tolist(), "quat": quat_0_to_marker.tolist()})
-
-        object_points_from_object = np.array([[-MARKER_LENGTH/2, MARKER_LENGTH/2, 0, 1], 
-                                              [MARKER_LENGTH/2, MARKER_LENGTH/2, 0, 1], 
-                                              [MARKER_LENGTH/2, -MARKER_LENGTH/2, 0, 1],
-                                              [-MARKER_LENGTH/2, -MARKER_LENGTH/2, 0, 1]])
-        points = [T_0_to_marker @ v for v in object_points_from_object]
-        ax.plot([points[0][0], points[1][0]], [points[0][1], points[1][1]], [points[0][2], points[1][2]], c='b')
-        ax.plot([points[1][0], points[2][0]], [points[1][1], points[2][1]], [points[1][2], points[2][2]], c='b')
-        ax.plot([points[2][0], points[3][0]], [points[2][1], points[3][1]], [points[2][2], points[3][2]], c='b')
-        ax.plot([points[3][0], points[0][0]], [points[3][1], points[0][1]], [points[3][2], points[0][2]], c='b')
-        textPos = T_0_to_marker@[0,0,0,1]
-        ax.text(textPos[0], textPos[1], textPos[2], f"{marker['id']}")
 
     if save_markers and len(markers_from_0) > 0:
         marker_info.append(markers_from_0)
@@ -173,12 +121,6 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info):
         cam_matrix: matrix containgn the intrinsic parameters of the camera
         dist_coeffs: Array containing the distortion coefficients of the camera
     """
-    # Prepare figure
-    if args.Visualization:
-        fig_camera_frame = pylab.figure("Camera frame")
-        ax_camera_frame = fig_camera_frame.add_subplot(111, projection='3d')
-        ax_camera_frame.view_init(elev=90, azim=-90, roll=0)
-        pylab.pause(0.01)
 
     save_markers = False
 
@@ -198,9 +140,7 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info):
 
         if np.any(ids == None):
             if args.Visualization:
-                print("about to vis")
                 cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
-                print("created window")
                 cv2.resizeWindow("frame", 800, 500)
                 cv2.imshow('frame', frame)
             key = cv2.waitKey(1)
@@ -218,12 +158,13 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info):
                 cv2.drawFrameAxes(frame, cam_matrix, dist_coeffs, rvec, tvec, MARKER_LENGTH*1.5, 2)
 
         if args.Visualization:
-            plotScene(markers, ax_camera_frame, save_markers, marker_info)
+            # plotScene(markers, ax_camera_frame, save_markers, marker_info)
+            computeMarkerInfo(markers, save_markers, marker_info)
+            save_markers = False
 
             cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
             cv2.resizeWindow("frame", 800, 500)
             cv2.imshow('frame', frame)
-        save_markers = False
         key = cv2.waitKey(1)
         if key == 27:
             break  # Exit on ESC
@@ -281,7 +222,7 @@ def main():
 
     marker_info = leastSquaresMarkers(marker_info)
 
-    with open('MarkerInfo.json', 'w') as f:
+    with open('src/camera_pose/camera_pose/MarkerInfo/MarkerInfo.json', 'w') as f:
         json.dump(marker_info, f, indent=4)
 
 
