@@ -19,7 +19,7 @@ parser.add_argument("-v", "--Visualization", help = "Show Output", default=True)
 # Read arguments from command line
 args = parser.parse_args()
 
-def load_camera_calibration(calib_file="CamData/rgbd_with_metal_thing.json"):
+def load_camera_calibration(calib_file="camera_pose/camera_pose/CamData/rgbd_with_metal_thing.json"):
     """
     Load camera calibration parameters from a JSON file. 
     From Shady
@@ -198,7 +198,9 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info):
 
         if np.any(ids == None):
             if args.Visualization:
+                print("about to vis")
                 cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
+                print("created window")
                 cv2.resizeWindow("frame", 800, 500)
                 cv2.imshow('frame', frame)
             key = cv2.waitKey(1)
@@ -263,7 +265,7 @@ def leastSquaresMarkers(marker_info):
 def main():
     camera_matrix, dist_coeffs = load_camera_calibration()
 
-    video_capture = cv2.VideoCapture(6) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
+    video_capture = cv2.VideoCapture(0) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250) #TODO: Change to 4x4 when changing input
     parameters = cv2.aruco.DetectorParameters()
