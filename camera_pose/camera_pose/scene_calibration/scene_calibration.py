@@ -1,9 +1,6 @@
 import cv2
 import numpy as np
 import json
-import matplotlib.pyplot as plt
-import pylab
-import time
 import argparse
 from scipy.spatial.transform import Rotation as rot
 
@@ -109,7 +106,6 @@ def computeMarkerInfo(markers, save_markers, marker_info = []):
 
     if save_markers and len(markers_from_0) > 0:
         marker_info.append(markers_from_0)
-    pylab.pause(0.01)
 
 def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info):
     """
