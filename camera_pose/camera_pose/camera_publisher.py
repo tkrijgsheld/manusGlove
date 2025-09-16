@@ -1,13 +1,25 @@
 import cv2
 import numpy as np
 import json
-import scipy.spatial.transform.rotation as rot
+import pylab
+import argparse
+from scipy.spatial.transform import Rotation as rot
 import rclpy
 from rclpy.node import Node
 
 from geometry_msgs.msg import Pose, Point, Quaternion
 
+
 MARKER_LENGTH = 0.05
+
+# Initialize parser
+parser = argparse.ArgumentParser()
+
+# Adding optional argument
+parser.add_argument("-v", "--Visualization", help = "Show Output", default=False)
+
+# Read arguments from command line
+args = parser.parse_args()
 
 class MinimalPublisher(Node):
 
@@ -29,7 +41,7 @@ class MinimalPublisher(Node):
         self.publisher_.publish(msg)
         self.get_logger().info('Publishing: "%s"' % msg)
 
-def load_camera_calibration(calib_file="src/camera_pose/camera_pose/CamData/rgbd_with_screwed_on_thing.json"):
+def load_camera_calibration(calib_file="src/camera_pose/camera_pose/CamData/rgbd_with_metal_thing.json"):
     """
     Load camera calibration parameters from a JSON file. 
     From Shady
@@ -54,6 +66,21 @@ def load_camera_calibration(calib_file="src/camera_pose/camera_pose/CamData/rgbd
 
     return camera_matrix, dist_coeffs
 
+def clearFig(ax):
+    """
+    Clears the figure in order to show only one marker/camera position per frame
+
+    Parameters:
+        ax: figure to clear
+    """
+    ax.cla()
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_xlim(-0.5,0.5)
+    ax.set_ylim(-0.5,0.5)
+    ax.set_zlim(-0.5,0.5)
+
 def getTransformationMatrix(marker):
     """
     Creates transformation matrix from camera to marker
@@ -76,50 +103,145 @@ def getTransformationMatrix(marker):
 
     return T_camera_to_marker
 
-def getTransformationCamera(markers):
+def plotZeroMarker(ax):
+    points = np.array([[-MARKER_LENGTH/2, MARKER_LENGTH/2, 0, 1], 
+                        [MARKER_LENGTH/2, MARKER_LENGTH/2, 0, 1], 
+                        [MARKER_LENGTH/2, -MARKER_LENGTH/2, 0, 1],
+                        [-MARKER_LENGTH/2, -MARKER_LENGTH/2, 0, 1]])
+
+    
+    ax.plot([points[0][0], points[1][0]], [points[0][1], points[1][1]], [points[0][2], points[1][2]], c='b')
+    ax.plot([points[1][0], points[2][0]], [points[1][1], points[2][1]], [points[1][2], points[2][2]], c='b')
+    ax.plot([points[2][0], points[3][0]], [points[2][1], points[3][1]], [points[2][2], points[3][2]], c='b')
+    ax.plot([points[3][0], points[0][0]], [points[3][1], points[0][1]], [points[3][2], points[0][2]], c='b')
+
+def plotScene(marker_poses, quatCam, tvecCam, ax):
     """
-    Function to get the transformation from the marker to the camera.
-    If multiple markers are detected, the average transformation is returned.
+    Function to plot the scene with the marker 0 at the origin.
+    The camera and other markers are plotted relative to marker 0.
+    If marker 0 is not detected, it is still assumed to be the origin.
+    Parameters:
+        markers: List of dictionaries containing a rotation vector and a translation vector
+        ax: figure to plot the scene in
+    """
+    clearFig(ax)
+
+    plotZeroMarker(ax)
+
+    rotation_cam = rot.from_quat(quatCam)
+
+    xPoint = rotation_cam.apply([0.1, 0, 0]) + tvecCam
+    yPoint = rotation_cam.apply([0, 0.1, 0]) + tvecCam
+    zPoint = rotation_cam.apply([0, 0, 0.1]) + tvecCam
+    ax.scatter(tvecCam[0], tvecCam[1], tvecCam[2], c='black')
+    ax.plot([tvecCam[0], xPoint[0]], [tvecCam[1], xPoint[1]], [tvecCam[2], xPoint[2]], c='r')
+    ax.plot([tvecCam[0], yPoint[0]], [tvecCam[1], yPoint[1]], [tvecCam[2], yPoint[2]], c='g')
+    ax.plot([tvecCam[0], zPoint[0]], [tvecCam[1], zPoint[1]], [tvecCam[2], zPoint[2]], c='b')
+
+    for marker in marker_poses:
+
+        rotation_0_to_marker = rot.from_quat(marker["quat"])
+        tvec_0_to_marker = marker["tvec"]
+        R_0_to_marker = rotation_0_to_marker.as_matrix()
+        T_0_to_marker = np.eye(4)
+        T_0_to_marker[:3, :3] = R_0_to_marker
+        T_0_to_marker[:3, 3] = tvec_0_to_marker
+
+        object_points_from_object = np.array([[-MARKER_LENGTH/2, MARKER_LENGTH/2, 0, 1], 
+                                              [MARKER_LENGTH/2, MARKER_LENGTH/2, 0, 1], 
+                                              [MARKER_LENGTH/2, -MARKER_LENGTH/2, 0, 1],
+                                              [-MARKER_LENGTH/2, -MARKER_LENGTH/2, 0, 1]])
+        points = [T_0_to_marker @ v for v in object_points_from_object]
+        ax.plot([points[0][0], points[1][0]], [points[0][1], points[1][1]], [points[0][2], points[1][2]], c='b')
+        ax.plot([points[1][0], points[2][0]], [points[1][1], points[2][1]], [points[1][2], points[2][2]], c='b')
+        ax.plot([points[2][0], points[3][0]], [points[2][1], points[3][1]], [points[2][2], points[3][2]], c='b')
+        ax.plot([points[3][0], points[0][0]], [points[3][1], points[0][1]], [points[3][2], points[0][2]], c='b')
+        textPos = T_0_to_marker@[0,0,0,1]
+        ax.text(textPos[0], textPos[1], textPos[2], f"{marker['id']}")
+    
+    pylab.pause(0.01)
+
+
+def getPoseCamera(markers, marker_info):
+    """
+    Function to get the pose the camera in the world (marker 0) frame.
+    If multiple markers are detected, the average pose is returned.
     TODO: Improve this by using a more robust method. Like least squares.
-        Also this is relative to the markers, not to the world frame. Right? #TODO
 
     Parameters:
         markers: List of dictionaries containing a rotation vector and a translation vector
+        marker_info: List containing the saved marker info from the scene
 
     Returns:
-        rvecCam: Rotation vector from marker to camera in quaternion format (w, x, y, z)
+        rvecCam: Rotation vector from marker to camera
         tvecCam: Translation vector from marker to camera
     """
     if len(markers) == 0:
         return None, None
+    
+    cam_poses = []
+    marker_poses = []
 
-    T_matrices = [getTransformationMatrix(marker) for marker in markers]
-    T_camera_to_marker = sum(T_matrices) / len(T_matrices)
-    R_camera_to_marker = T_camera_to_marker[:3, :3]
-    tvec_camera_to_marker = T_camera_to_marker[:3, 3]
+    for marker in markers:
+        id = marker["id"]
+        T_cam_to_marker = getTransformationMatrix(marker)
+        T_marker_to_camera = np.linalg.inv(T_cam_to_marker)
+        R_marker_to_camera = T_marker_to_camera[:3, :3]
+        tvec_marker_to_camera = T_marker_to_camera[:3, 3]
+        rotation_marker_to_camera = rot.from_matrix(R_marker_to_camera)
+        quat_marker_to_camera = rotation_marker_to_camera.as_quat()
+        if id == 0:
+            cam_poses.append({"tvec": tvec_marker_to_camera, "quat": quat_marker_to_camera, "id": id})
+        else:
+            this_marker_info = None
+            for info in marker_info:
+                if info["id"] == id:
+                    this_marker_info = info
+                    break
+            if this_marker_info is None:
+                print("Unknown marker id. Cannot compute cam pose relative to marker")
+                continue
+            tvec_zero_to_marker = np.array(this_marker_info["tvec"])
+            quat_zero_to_marker = np.array(this_marker_info["quat"])
+            rotation_zero_to_marker = rot.from_quat(quat_zero_to_marker)
+            rotation_zero_to_camera = rotation_zero_to_marker * rotation_marker_to_camera
+            quat_zero_to_camera = rotation_zero_to_camera.as_quat()
+            tvec_zero_to_camera = rotation_zero_to_marker.apply(tvec_marker_to_camera) + tvec_zero_to_marker
+            cam_poses.append({"tvec": tvec_zero_to_camera, "quat": quat_zero_to_camera, "id": id})
+            marker_poses.append({"tvec": tvec_zero_to_marker, "quat": quat_zero_to_marker, "id": id})
 
-    R_marker_to_camera = R_camera_to_marker.T
-    tvec_marker_to_camera = -R_marker_to_camera @ tvec_camera_to_marker
+    if len(cam_poses) == 0:
+        return None, None, marker_poses
 
-    rvecCam, _ = cv2.Rodrigues(R_marker_to_camera)
+    tvecCam = np.zeros(3)
+    quatCam = np.zeros(4)
+    quatCam[0] = 1 # Initialize as unit quaternion
+    for pose in cam_poses:
+        tvecCam += pose["tvec"]
+        quatCam += pose["quat"]
+    tvecCam /= len(cam_poses)
+    quatCam /= len(cam_poses)
+    quatCam /= np.linalg.norm(quatCam)
 
-    rotation = rot.Rotation.from_matrix(R_marker_to_camera)
-    rvecCam = rotation.as_quat(scalar_first=True).reshape((4, 1))
+    return quatCam, tvecCam, marker_poses
 
-    tvecCam = tvec_marker_to_camera.reshape((3, 1))
-
-    return rvecCam.flatten(), tvecCam.flatten()
-
-def processVideo(cap, detector, cam_matrix, dist_coeffs, ros2Publisher):
+def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info, ros2Publisher):
     """
     Processes the video in cap, to paint in the axes of the marker and create a plot to visualize the 3D positions.
-
+    
     Parameters:
         cap: cv2.VideoCapture containing the video to process
         detector: aruco marker detector
         cam_matrix: matrix containgn the intrinsic parameters of the camera
         dist_coeffs: Array containing the distortion coefficients of the camera
     """
+    # Prepare figure
+    if args.Visualization:
+        fig_camera_frame = pylab.figure("Camera frame")
+        ax_camera_frame = fig_camera_frame.add_subplot(111, projection='3d')
+        ax_camera_frame.view_init(elev=90, azim=-90, roll=0)
+        pylab.pause(0.01)
+
     while True:
         ret, frame = cap.read()
         markers = []
@@ -135,7 +257,13 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, ros2Publisher):
                         [-MARKER_LENGTH/2, -MARKER_LENGTH/2, 0]], dtype=np.float32)
 
         if np.any(ids == None):
-            print("No markers detected")
+            if args.Visualization:
+                cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
+                cv2.resizeWindow("frame", 800, 500)
+                cv2.imshow('frame', frame)
+            key = cv2.waitKey(1)
+            if key == 27:
+                break  # Exit on ESC
             continue
 
         for (corner, id) in zip(corners, ids):
@@ -143,23 +271,51 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, ros2Publisher):
             if success:
                 marker = {"rvec": rvec,
                         "tvec": tvec, 
-                        "id": id}
+                        "id": id[0]}
                 markers.append(marker)
                 cv2.drawFrameAxes(frame, cam_matrix, dist_coeffs, rvec, tvec, MARKER_LENGTH*1.5, 2)
 
-        rvecCam, tvecCam = getTransformationCamera(markers)
-        pos = []
-        quat = []
-        for i in rvecCam:
-            quat.append(float(i))
-        for i in tvecCam:
-            pos.append(float(i))
+        quatCam, tvecCam, marker_poses = getPoseCamera(markers, marker_info)
+
+        if quatCam is None or tvecCam is None:
+            if args.Visualization:
+                cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
+                cv2.resizeWindow("frame", 800, 500)
+                cv2.imshow('frame', frame)
+            key = cv2.waitKey(1)
+            if key == 27:
+                break  # Exit on ESC
+            continue
+
+        if args.Visualization:
+            plotScene(marker_poses, quatCam, tvecCam, ax_camera_frame)
+
+            cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
+            cv2.resizeWindow("frame", 800, 500)
+            cv2.imshow('frame', frame)
+
         if ros2Publisher is not None:
-            ros2Publisher.sendData(pos, quat)
+            ros2Publisher.sendData(tvecCam.tolist(), quatCam.tolist())
 
         key = cv2.waitKey(1)
         if key == 27:
             break  # Exit on ESC
+
+def readMarkerInfo(file="src/camera_pose/camera_pose/MarkerInfo/MarkerInfo.json"):
+    """
+    Reads the marker info from a json file.
+
+    Parameters:
+        file: Path to the json file
+    Returns:
+        marker_info: List containing the marker info
+    """
+    try:
+        with open(file, 'r') as f:
+            marker_info = json.load(f)
+    except FileNotFoundError:
+        marker_info = []
+    return marker_info
 
 def main(ros2Publisher=None):
 
@@ -167,18 +323,21 @@ def main(ros2Publisher=None):
 
     minimal_publisher = MinimalPublisher()
 
-    # rclpy.spin(minimal_publisher)
-
     camera_matrix, dist_coeffs = load_camera_calibration()
 
-    video_capture = cv2.VideoCapture(6) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
+    video_capture = cv2.VideoCapture(0) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
 
-    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
+    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250) #TODO: Change to 4x4 when changing input
     parameters = cv2.aruco.DetectorParameters()
 
     detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
 
-    processVideo(video_capture, detector, camera_matrix, dist_coeffs, minimal_publisher)
+    marker_info = readMarkerInfo()
+
+    processVideo(video_capture, detector, camera_matrix, dist_coeffs, marker_info, minimal_publisher)
+
+    video_capture.release()
+    cv2.destroyAllWindows()
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically

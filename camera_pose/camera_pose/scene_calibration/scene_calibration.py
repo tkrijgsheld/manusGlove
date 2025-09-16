@@ -201,7 +201,7 @@ def leastSquaresMarkers(marker_info):
 def main():
     camera_matrix, dist_coeffs = load_camera_calibration()
 
-    video_capture = cv2.VideoCapture(6) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
+    video_capture = cv2.VideoCapture(0) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250) #TODO: Change to 4x4 when changing input
     parameters = cv2.aruco.DetectorParameters()
