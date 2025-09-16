@@ -85,7 +85,7 @@ def computeMarkerInfo(markers, save_markers, marker_info = []):
         print("Marker 0 not found")
         return
 
-    markers = [m for m in markers if m["id"] != 0] # Remove all other markers with id 0
+    markers = [m for m in markers if m["id"] != 0] # Remove marker 0 as its pose is now the origin
     
     T_cam_to_0 = getTransformationMatrix(markerZero)
     T_0_to_cam = np.linalg.inv(T_cam_to_0)
@@ -154,7 +154,6 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info):
                 cv2.drawFrameAxes(frame, cam_matrix, dist_coeffs, rvec, tvec, MARKER_LENGTH*1.5, 2)
 
         if args.Visualization:
-            # plotScene(markers, ax_camera_frame, save_markers, marker_info)
             computeMarkerInfo(markers, save_markers, marker_info)
             save_markers = False
 
@@ -202,7 +201,7 @@ def leastSquaresMarkers(marker_info):
 def main():
     camera_matrix, dist_coeffs = load_camera_calibration()
 
-    video_capture = cv2.VideoCapture(0) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
+    video_capture = cv2.VideoCapture(6) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250) #TODO: Change to 4x4 when changing input
     parameters = cv2.aruco.DetectorParameters()
