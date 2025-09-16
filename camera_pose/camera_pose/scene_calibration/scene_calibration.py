@@ -172,12 +172,12 @@ def average_quaternions(quaternions):
     quaternions: Nx4 numpy array
     Returns: 4-element numpy array (average quaternion)
     """
-    A = np.zeros((4, 4))
+    M = np.zeros((4, 4))
     for q in quaternions:
         q = np.array(q, dtype=np.float64).reshape(4, 1)
-        A += q @ q.T
+        M += q @ q.T
     # Get the eigenvector corresponding to the largest eigenvalue
-    eigvals, eigvecs = np.linalg.eigh(A)
+    eigvals, eigvecs = np.linalg.eigh(M)
     avg_quat = eigvecs[:, np.argmax(eigvals)]
     # Ensure the quaternion has positive scalar part
     if avg_quat[0] < 0:
