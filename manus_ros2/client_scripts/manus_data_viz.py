@@ -324,7 +324,7 @@ class MinimalSubscriber(Node):
 
         # update hand position and orientation based on camera pose
         # print("pos:", msg.position.x, msg.position.y, msg.position.z, "quat:", msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z)
-        # self.hand_ctl.pos_from_cam = [msg.position.x, msg.position.y, msg.position.z]
+        self.hand_ctl.pos_from_cam = [msg.position.x, msg.position.y, msg.position.z]
         self.hand_ctl.rot_from_cam = [msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z]
 
     def timer_callback(self):
