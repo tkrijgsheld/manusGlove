@@ -87,6 +87,8 @@ class HandControl:
         self.rot_from_cam = np.zeros(4)
         self.rot_from_cam[0] = 1.0
 
+        self.root_pos = np.zeros(3)
+
     def update_target(self, finger_positions):
         """update finger tip target positions"""
         with self.lock:
@@ -118,7 +120,15 @@ class HandControl:
                         mat=np.eye(3).flatten(),
                         rgba=[1, 0.2, 0.7, 1],
                     )
-                self.viewer.user_scn.ngeom = i + 1
+                mujoco.mjv_initGeom(
+                        self.viewer.user_scn.geoms[i+1],
+                        type=mujoco.mjtGeom.mjGEOM_SPHERE,
+                        size=[0.01, 0, 0],
+                        pos=self.root_pos,
+                        mat=np.eye(3).flatten(),
+                        rgba=[1, 0.2, 0.7, 1],
+                )
+                self.viewer.user_scn.ngeom = i + 2
 
             # print(self.model.body("lh_forearm").pos)
             self.model.body("lh_forearm").pos = self.pos_from_cam # Replace with some pos from my aruco marker detection
@@ -206,10 +216,13 @@ class MinimalSubscriber(Node):
                 glove_viz.frame_mesh.rotate(rot_mat)
                 glove_viz.frame_mesh.translate([pose.position.x, pose.position.y, pose.position.z], relative=False)
                 glove_viz.viz.update_geometry(glove_viz.frame_mesh)
-
+                rot_mat_cam = o3d.geometry.TriangleMesh.get_rotation_matrix_from_quaternion(
+                    self.hand_ctl.rot_from_cam
+                )
+                rot_mat = rot_mat @ rot_mat_cam
                 root_pose = mink.SE3.from_rotation_and_translation(
                     mink.SO3.from_matrix(rot_mat),
-                    np.array([pose.position.x, pose.position.y, pose.position.z]),
+                    np.array([pose.position.x + self.hand_ctl.pos_from_cam[0], pose.position.y + self.hand_ctl.pos_from_cam[1], pose.position.z + self.hand_ctl.pos_from_cam[2]]),
                 )
 
         assert root_pose is not None
@@ -269,6 +282,7 @@ class MinimalSubscriber(Node):
 
         assert len(tip_positions) == 5
         self.hand_ctl.update_target(tip_positions)
+        self.hand_ctl.root_pos = root_pose.translation()
         # print(tip_positions)
 
     def hierarchy_callback(self, msg: ManusNodeHierarchy):
