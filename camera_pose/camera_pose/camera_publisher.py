@@ -16,7 +16,7 @@ MARKER_LENGTH = 0.05
 parser = argparse.ArgumentParser()
 
 # Adding optional argument
-parser.add_argument("-v", "--Visualization", help = "Show Output", default=False)
+parser.add_argument("-v", "--Visualization", help = "Show Output", default=True)
 
 # Read arguments from command line
 args = parser.parse_args()
@@ -270,10 +270,10 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info, ros2Publis
                         [-MARKER_LENGTH/2, -MARKER_LENGTH/2, 0]], dtype=np.float32)
 
         if np.any(ids == None):
-            if args.Visualization:
-                cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
-                cv2.resizeWindow("frame", 800, 500)
-                cv2.imshow('frame', frame)
+            # if args.Visualization:
+                # cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
+                # cv2.resizeWindow("frame", 800, 500)
+                # cv2.imshow('frame', frame)
             key = cv2.waitKey(1)
             if key == 27:
                 break  # Exit on ESC
@@ -291,10 +291,10 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info, ros2Publis
         quatCam, tvecCam, marker_poses = getPoseCamera(markers, marker_info)
 
         if quatCam is None or tvecCam is None:
-            if args.Visualization:
-                cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
-                cv2.resizeWindow("frame", 800, 500)
-                cv2.imshow('frame', frame)
+            # if args.Visualization:
+                # cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
+                # cv2.resizeWindow("frame", 800, 500)
+                # cv2.imshow('frame', frame)
             key = cv2.waitKey(1)
             if key == 27:
                 break  # Exit on ESC
@@ -303,9 +303,9 @@ def processVideo(cap, detector, cam_matrix, dist_coeffs, marker_info, ros2Publis
         if args.Visualization:
             plotScene(marker_poses, quatCam, tvecCam, ax_camera_frame)
 
-            cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
-            cv2.resizeWindow("frame", 800, 500)
-            cv2.imshow('frame', frame)
+            # cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
+            # cv2.resizeWindow("frame", 800, 500)
+            # cv2.imshow('frame', frame)
 
         if ros2Publisher is not None:
             ros2Publisher.sendData(tvecCam.tolist(), quatCam.tolist())
