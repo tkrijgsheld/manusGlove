@@ -85,6 +85,7 @@ class HandControl:
         self.rate = RateLimiter(frequency=100.0, warn=False)
         self.pos_from_cam = np.zeros(3)
         self.rot_from_cam = np.zeros(4)
+        self.rot_from_cam[0] = 1.0
 
     def update_target(self, finger_positions):
         """update finger tip target positions"""
@@ -217,6 +218,7 @@ class MinimalSubscriber(Node):
 
         # get finger tip poses
         tip_positions = {}
+
         for node_id, pose in zip(msg.node_ids, msg.poses):
             if node_id not in glove_viz.node_meshes:
                 continue
@@ -321,8 +323,8 @@ class MinimalSubscriber(Node):
         """callback for camera pose"""
 
         # update hand position and orientation based on camera pose
-        print("pos:", msg.position.x, msg.position.y, msg.position.z, "quat:", msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z)
-        self.hand_ctl.pos_from_cam = [msg.position.x, msg.position.y, msg.position.z]
+        # print("pos:", msg.position.x, msg.position.y, msg.position.z, "quat:", msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z)
+        # self.hand_ctl.pos_from_cam = [msg.position.x, msg.position.y, msg.position.z]
         self.hand_ctl.rot_from_cam = [msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z]
 
     def timer_callback(self):
