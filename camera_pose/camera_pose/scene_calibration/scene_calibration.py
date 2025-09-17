@@ -99,7 +99,7 @@ def computeMarkerInfo(markers, save_markers, marker_info = []):
         R_0_to_marker = T_0_to_marker[:3, :3]
         tvec_0_to_marker = T_0_to_marker[:3, 3]
 
-        quat_0_to_marker = rot.from_matrix(R_0_to_marker).as_quat()
+        quat_0_to_marker = rot.from_matrix(R_0_to_marker).as_quat(scalar_first=True)
         if save_markers:
             print(f"Saving marker {marker['id']}")
             markers_from_0.append({"id": int(marker["id"]), "tvec": tvec_0_to_marker.tolist(), "quat": quat_0_to_marker.tolist()})
@@ -211,9 +211,9 @@ def leastSquaresMarkers(marker_info):
 def main():
     camera_matrix, dist_coeffs = load_camera_calibration()
 
-    video_capture = cv2.VideoCapture(0) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
+    video_capture = cv2.VideoCapture(6) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
 
-    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250) #TODO: Change to 4x4 when changing input
+    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
     parameters = cv2.aruco.DetectorParameters()
 
     detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)

@@ -128,7 +128,7 @@ def plotScene(marker_poses, quatCam, tvecCam, ax):
 
     plotZeroMarker(ax)
 
-    rotation_cam = rot.from_quat(quatCam)
+    rotation_cam = rot.from_quat(quatCam, scalar_first=True)
 
     xPoint = rotation_cam.apply([0.1, 0, 0]) + tvecCam
     yPoint = rotation_cam.apply([0, 0.1, 0]) + tvecCam
@@ -140,7 +140,7 @@ def plotScene(marker_poses, quatCam, tvecCam, ax):
 
     for marker in marker_poses:
 
-        rotation_0_to_marker = rot.from_quat(marker["quat"])
+        rotation_0_to_marker = rot.from_quat(marker["quat"], scalar_first=True)
         tvec_0_to_marker = marker["tvec"]
         R_0_to_marker = rotation_0_to_marker.as_matrix()
         T_0_to_marker = np.eye(4)
@@ -206,7 +206,7 @@ def getPoseCamera(markers, marker_info):
         R_marker_to_camera = T_marker_to_camera[:3, :3]
         tvec_marker_to_camera = T_marker_to_camera[:3, 3]
         rotation_marker_to_camera = rot.from_matrix(R_marker_to_camera)
-        quat_marker_to_camera = rotation_marker_to_camera.as_quat()
+        quat_marker_to_camera = rotation_marker_to_camera.as_quat(scalar_first=True)
         if id == 0:
             cam_poses.append({"tvec": tvec_marker_to_camera, "quat": quat_marker_to_camera, "id": id})
         else:
@@ -216,13 +216,13 @@ def getPoseCamera(markers, marker_info):
                     this_marker_info = info
                     break
             if this_marker_info is None:
-                print("Unknown marker id. Cannot compute cam pose relative to marker")
+                print(f"Unknown marker id: {id}. Cannot compute cam pose relative to marker")
                 continue
             tvec_zero_to_marker = np.array(this_marker_info["tvec"])
             quat_zero_to_marker = np.array(this_marker_info["quat"])
-            rotation_zero_to_marker = rot.from_quat(quat_zero_to_marker)
+            rotation_zero_to_marker = rot.from_quat(quat_zero_to_marker, scalar_first=True)
             rotation_zero_to_camera = rotation_zero_to_marker * rotation_marker_to_camera
-            quat_zero_to_camera = rotation_zero_to_camera.as_quat()
+            quat_zero_to_camera = rotation_zero_to_camera.as_quat(scalar_first=True)
             tvec_zero_to_camera = rotation_zero_to_marker.apply(tvec_marker_to_camera) + tvec_zero_to_marker
             cam_poses.append({"tvec": tvec_zero_to_camera, "quat": quat_zero_to_camera, "id": id})
             marker_poses.append({"tvec": tvec_zero_to_marker, "quat": quat_zero_to_marker, "id": id})
@@ -338,7 +338,7 @@ def main(ros2Publisher=None):
 
     camera_matrix, dist_coeffs = load_camera_calibration()
 
-    video_capture = cv2.VideoCapture(0) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
+    video_capture = cv2.VideoCapture(6) # Now hardcoded as 6, since this is the rgb cam from the rgbd camera
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250) #TODO: Change to 4x4 when changing input
     parameters = cv2.aruco.DetectorParameters()

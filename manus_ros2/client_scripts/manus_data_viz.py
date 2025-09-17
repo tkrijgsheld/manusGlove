@@ -3,6 +3,7 @@ import sys
 import threading
 from pathlib import Path
 
+from scipy.spatial.transform import Rotation as rot
 import cv2
 import mink
 import mujoco
@@ -120,7 +121,7 @@ class HandControl:
 
             # print(self.model.body("lh_forearm").pos)
             self.model.body("lh_forearm").pos = self.pos_from_cam # Replace with some pos from my aruco marker detection
-            # self.model.body("lh_forearm").quat = self.rot_from_cam
+            self.model.body("lh_forearm").quat = self.rot_from_cam
 
             # step environment
             mujoco.mj_step(self.model, self.data)
